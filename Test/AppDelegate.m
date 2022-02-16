@@ -40,21 +40,21 @@
     // Start to create a new aggregate by getting the base audio hardware plugin
     //-----------------------
 
-    osErr = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyPlugInForBundleID, &outSize, &outWritable);
-    if (osErr != noErr) return osErr;
-
-    AudioValueTranslation pluginAVT;
-
-    CFStringRef inBundleRef = CFSTR("com.apple.audio.CoreAudio");
-    AudioObjectID pluginID;
-
-    pluginAVT.mInputData = &inBundleRef;
-    pluginAVT.mInputDataSize = sizeof(inBundleRef);
-    pluginAVT.mOutputData = &pluginID;
-    pluginAVT.mOutputDataSize = sizeof(pluginID);
-
-    osErr = AudioHardwareGetProperty(kAudioHardwarePropertyPlugInForBundleID, &outSize, &pluginAVT);
-    if (osErr != noErr) return osErr;
+//    osErr = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyPlugInForBundleID, &outSize, &outWritable);
+//    if (osErr != noErr) return osErr;
+//
+//    AudioValueTranslation pluginAVT;
+//
+//    CFStringRef inBundleRef = CFSTR("com.apple.audio.CoreAudio");
+//    AudioObjectID pluginID;
+//
+//    pluginAVT.mInputData = &inBundleRef;
+//    pluginAVT.mInputDataSize = sizeof(inBundleRef);
+//    pluginAVT.mOutputData = &pluginID;
+//    pluginAVT.mOutputDataSize = sizeof(pluginID);
+//
+//    osErr = AudioHardwareGetProperty(kAudioHardwarePropertyPlugInForBundleID, &outSize, &pluginAVT);
+//    if (osErr != noErr) return osErr;
 
     AudioObjectPropertyAddress pluginDevices;
     pluginDevices.mSelector = kAudioHardwarePropertyDevices;
@@ -73,13 +73,13 @@
     if (osErr != noErr) return osErr;
     
     for (int i = 0; i < numDevices; i++) {
-        NSLog(@"%u", (unsigned int)devids[i]);
         AudioObjectPropertyAddress address;
         address.mSelector = kAudioDevicePropertyDeviceUID;
         address.mScope = kAudioObjectPropertyScopeGlobal;
         address.mElement = kAudioObjectPropertyElementMaster;
-        UInt32 propsize;
         NSString *uid, *name;
+//        UInt32 propsize = sizeof(NSString);
+        NSLog(@"%u %u", (unsigned int)devids[i], propsize);
 
         osErr = AudioObjectGetPropertyData(devids[i], &address, 0, NULL, &propsize, &uid);
         deviceUIDs[i] = uid;
@@ -108,6 +108,9 @@
     // add our choice of UID for the aggregate device to the dictionary
     CFDictionaryAddValue(aggDeviceDict, CFSTR(kAudioAggregateDeviceUIDKey), AggregateDeviceUIDRef);
 
+    osErr = AudioHardwareCreateAggregateDevice(aggDeviceDict, &outAggregateDevice);
+    
+    NSLog(@"outAggregateDevice %u", (unsigned int)outAggregateDevice);
     //-----------------------
     // Create a CFMutableArray for our sub-device list
     //-----------------------
@@ -115,8 +118,10 @@
     // this example assumes that you already know the UID of the device to be added
     // you can find this for a given AudioDeviceID via AudioDeviceGetProperty for the kAudioDevicePropertyDeviceUID property
     // obviously the example deviceUID below won't actually work!
-    CFStringRef deviceUID1 = (__bridge CFStringRef)deviceUIDs[0];
-    CFStringRef deviceUID2 = (__bridge CFStringRef)deviceUIDs[3];
+//    CFStringRef deviceUID1 = (__bridge CFStringRef)deviceUIDs[0];
+//    CFStringRef deviceUID2 = (__bridge CFStringRef)deviceUIDs[5];
+    CFStringRef deviceUID1 = (__bridge CFStringRef)@"AppleHDAEngineInput:1,0,1,0:3";
+    CFStringRef deviceUID2 = (__bridge CFStringRef)@"CrestronDevice";
 
     // we need to append the UID for each device to a CFMutableArray, so create one here
     CFMutableArrayRef subDevicesArray = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
@@ -132,16 +137,7 @@
     //-----------------------
 
     AudioObjectPropertyAddress pluginAOPA;
-    pluginAOPA.mSelector = kAudioPlugInCreateAggregateDevice;
-    pluginAOPA.mScope = kAudioObjectPropertyScopeGlobal;
-    pluginAOPA.mElement = kAudioObjectPropertyElementMaster;
     UInt32 outDataSize;
-
-    osErr = AudioObjectGetPropertyDataSize(pluginID, &pluginAOPA, 0, NULL, &outDataSize);
-    if (osErr != noErr) return osErr;
-
-    osErr = AudioObjectGetPropertyData(pluginID, &pluginAOPA, sizeof(aggDeviceDict), &aggDeviceDict, &outDataSize, &outAggregateDevice);
-    if (osErr != noErr) return osErr;
 
     // pause for a bit to make sure that everything completed correctly
     // this is to work around a bug in the HAL where a new aggregate device seems to disappear briefly after it is created
@@ -197,43 +193,7 @@
     
     OSStatus osErr = noErr;
 
-    //-----------------------
-    // Start by getting the base audio hardware plugin
-    //-----------------------
-
-    UInt32 outSize;
-    Boolean outWritable;
-    osErr = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyPlugInForBundleID, &outSize, &outWritable);
-    if (osErr != noErr) return osErr;
-
-    AudioValueTranslation pluginAVT;
-
-    CFStringRef inBundleRef = CFSTR("com.apple.audio.CoreAudio");
-    AudioObjectID pluginID;
-
-    pluginAVT.mInputData = &inBundleRef;
-    pluginAVT.mInputDataSize = sizeof(inBundleRef);
-    pluginAVT.mOutputData = &pluginID;
-    pluginAVT.mOutputDataSize = sizeof(pluginID);
-
-    osErr = AudioHardwareGetProperty(kAudioHardwarePropertyPlugInForBundleID, &outSize, &pluginAVT);
-    if (osErr != noErr) return osErr;
-
-    //-----------------------
-    // Feed the AudioDeviceID to the plugin, to destroy the aggregate device
-    //-----------------------
-
-    AudioObjectPropertyAddress pluginAOPA;
-    pluginAOPA.mSelector = kAudioPlugInDestroyAggregateDevice;
-    pluginAOPA.mScope = kAudioObjectPropertyScopeGlobal;
-    pluginAOPA.mElement = kAudioObjectPropertyElementMaster;
-    UInt32 outDataSize;
-
-    osErr = AudioObjectGetPropertyDataSize(pluginID, &pluginAOPA, 0, NULL, &outDataSize);
-    if (osErr != noErr) return osErr;
-
-    osErr = AudioObjectGetPropertyData(pluginID, &pluginAOPA, 0, NULL, &outDataSize, &outAggregateDevice);
-    if (osErr != noErr) return osErr;
+    osErr = AudioHardwareDestroyAggregateDevice(outAggregateDevice);
 
     return noErr;
 
