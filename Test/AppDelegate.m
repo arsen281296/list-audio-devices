@@ -6,17 +6,15 @@
 //
 
 #import "AppDelegate.h"
-#import <CoreFoundation/CoreFoundation.h>
-#import <CoreAudio/CoreAudio.h>
 
 @interface AppDelegate ()
 
 
 @end
 
-@implementation AppDelegate {
-    AudioDeviceID outAggregateDevice;
-}
+@implementation AppDelegate
+@synthesize outAggregateDevice;
+@synthesize defaultDevice;
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     // Insert code here to initialize your application
@@ -33,28 +31,10 @@
 
 - (OSStatus)CreateAggregateDevice {
     OSStatus osErr = noErr;
-    UInt32 outSize;
-    Boolean outWritable;
 
     //-----------------------
     // Start to create a new aggregate by getting the base audio hardware plugin
     //-----------------------
-
-//    osErr = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyPlugInForBundleID, &outSize, &outWritable);
-//    if (osErr != noErr) return osErr;
-//
-//    AudioValueTranslation pluginAVT;
-//
-//    CFStringRef inBundleRef = CFSTR("com.apple.audio.CoreAudio");
-//    AudioObjectID pluginID;
-//
-//    pluginAVT.mInputData = &inBundleRef;
-//    pluginAVT.mInputDataSize = sizeof(inBundleRef);
-//    pluginAVT.mOutputData = &pluginID;
-//    pluginAVT.mOutputDataSize = sizeof(pluginID);
-//
-//    osErr = AudioHardwareGetProperty(kAudioHardwarePropertyPlugInForBundleID, &outSize, &pluginAVT);
-//    if (osErr != noErr) return osErr;
 
     AudioObjectPropertyAddress pluginDevices;
     pluginDevices.mSelector = kAudioHardwarePropertyDevices;
@@ -68,30 +48,20 @@
     
     UInt32 numDevices = (UInt32)(propsize / sizeof(AudioObjectID));
     AudioObjectID devids[numDevices];
-    NSString* deviceUIDs[numDevices];
     osErr = AudioObjectGetPropertyData((AudioObjectID)(kAudioObjectSystemObject), &pluginDevices, 0, NULL, &propsize, &devids);
     if (osErr != noErr) return osErr;
     
     for (int i = 0; i < numDevices; i++) {
-        AudioObjectPropertyAddress address;
-        address.mSelector = kAudioDevicePropertyDeviceUID;
-        address.mScope = kAudioObjectPropertyScopeGlobal;
-        address.mElement = kAudioObjectPropertyElementMaster;
-        NSString *uid, *name;
-//        UInt32 propsize = sizeof(NSString);
-        NSLog(@"%u %u", (unsigned int)devids[i], propsize);
+        UInt32 channelCount = getChannelCount(devids[i], kAudioObjectPropertyScopeInput);
 
-        osErr = AudioObjectGetPropertyData(devids[i], &address, 0, NULL, &propsize, &uid);
-        deviceUIDs[i] = uid;
-
-        address.mSelector = kAudioDevicePropertyDeviceNameCFString;
-        address.mScope = kAudioObjectPropertyScopeGlobal;
-        address.mElement = kAudioObjectPropertyElementMaster;
-
-        osErr = AudioObjectGetPropertyData(devids[i], &address, 0, NULL, &propsize, &name);
-        NSLog(@"%@, %@", uid, name);
-        if (osErr != noErr) return osErr;
+        if (channelCount > 0) {
+            defaultDevice = devids[i];
+            
+            break;
+        }
     }
+    
+    NSString* uid = getStringProperty(defaultDevice, kAudioDevicePropertyDeviceUID);
 
     //-----------------------
     // Create a CFDictionary for our aggregate device
@@ -99,7 +69,7 @@
 
     CFMutableDictionaryRef aggDeviceDict = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-    CFStringRef AggregateDeviceNameRef = CFSTR("Crestron Wireless Conferencing Aggregate");
+    CFStringRef AggregateDeviceNameRef = CFSTR("Crestron Aggregate");
     CFStringRef AggregateDeviceUIDRef = CFSTR("com.Crestron.aggregate");
 
     // add the name of the device to the dictionary
@@ -109,8 +79,6 @@
     CFDictionaryAddValue(aggDeviceDict, CFSTR(kAudioAggregateDeviceUIDKey), AggregateDeviceUIDRef);
 
     osErr = AudioHardwareCreateAggregateDevice(aggDeviceDict, &outAggregateDevice);
-    
-    NSLog(@"outAggregateDevice %u", (unsigned int)outAggregateDevice);
     //-----------------------
     // Create a CFMutableArray for our sub-device list
     //-----------------------
@@ -120,15 +88,13 @@
     // obviously the example deviceUID below won't actually work!
 //    CFStringRef deviceUID1 = (__bridge CFStringRef)deviceUIDs[0];
 //    CFStringRef deviceUID2 = (__bridge CFStringRef)deviceUIDs[5];
-    CFStringRef deviceUID1 = (__bridge CFStringRef)@"AppleHDAEngineInput:1,0,1,0:3";
-    CFStringRef deviceUID2 = (__bridge CFStringRef)@"CrestronDevice";
+    CFStringRef deviceUID = (__bridge CFStringRef)uid;
 
     // we need to append the UID for each device to a CFMutableArray, so create one here
     CFMutableArrayRef subDevicesArray = CFArrayCreateMutable(NULL, 0, &kCFTypeArrayCallBacks);
 
     // just the one sub-device in this example, so append the sub-device's UID to the CFArray
-    CFArrayAppendValue(subDevicesArray, deviceUID1);
-    CFArrayAppendValue(subDevicesArray, deviceUID2);
+    CFArrayAppendValue(subDevicesArray, deviceUID);
 
     // if you need to add more than one sub-device, then keep calling CFArrayAppendValue here for the other sub-device UIDs
 
@@ -166,8 +132,8 @@
     pluginAOPA.mSelector = kAudioAggregateDevicePropertyMasterSubDevice;
     pluginAOPA.mScope = kAudioObjectPropertyScopeGlobal;
     pluginAOPA.mElement = kAudioObjectPropertyElementMaster;
-    outDataSize = sizeof(deviceUID1);
-    osErr = AudioObjectSetPropertyData(outAggregateDevice, &pluginAOPA, 0, NULL, outDataSize, &deviceUID1);
+    outDataSize = sizeof(deviceUID);
+    osErr = AudioObjectSetPropertyData(outAggregateDevice, &pluginAOPA, 0, NULL, outDataSize, &deviceUID);
     if (osErr != noErr) return osErr;
 
     // pause again to give the changes time to take effect
@@ -182,8 +148,7 @@
     CFRelease(subDevicesArray);
 
     // release the device UID
-    CFRelease(deviceUID1);
-    CFRelease(deviceUID2);
+    CFRelease(deviceUID);
 
     return noErr;
 

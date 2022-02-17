@@ -54,6 +54,7 @@
 		53AB3D0C27B582D30072186A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		53AB3D1C27B583B00072186A /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
 		53AB3D1D27B583B00072186A /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		53D7484E27BEEE3B00492744 /* Utils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Utils.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +117,7 @@
 				53AB3CF327B582D30072186A /* Info.plist */,
 				53AB3CF427B582D30072186A /* main.m */,
 				53AB3CF627B582D30072186A /* Test.entitlements */,
+				53D7484E27BEEE3B00492744 /* Utils.h */,
 			);
 			path = Test;
 			sourceTree = "<group>";
